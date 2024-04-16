@@ -1,6 +1,6 @@
 # serializers.py
 from rest_framework import serializers
-from .models import Property, Unit, RealityUser, Job, TemplateDescription
+from .models import Property, Unit, RealityUser, Job, TemplateDescription, Refresh, Schedule, Scheduleunits
 
 
 class UploadURLSerializer(serializers.ModelSerializer):
@@ -9,10 +9,22 @@ class UploadURLSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-# class ImageSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Images
-#         fields = '__all__'
+class RefreshSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Refresh
+        fields = '__all__'
+
+
+class ScheduleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Schedule
+        fields = '__all__'
+
+
+class ScheduleUnitSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Scheduleunits
+        fields = '__all__'
 
 
 class UnitSerializer(serializers.ModelSerializer):
