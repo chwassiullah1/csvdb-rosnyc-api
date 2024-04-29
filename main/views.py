@@ -29,6 +29,9 @@ from django.views import View
 from urllib.parse import unquote
 from django.http import FileResponse
 import os
+from rest_framework.pagination import PageNumberPagination
+from django.db.models import Q
+from rest_framework.filters import SearchFilter
 
 class UploadUser(APIView):
     def post(self, request):
@@ -44,6 +47,22 @@ class UploadUser(APIView):
                 instance_data = model_to_dict(reality)
                 return JsonResponse(instance_data)
         return Response('Some Error occured')
+
+
+class PropertySearchAPIView(generics.ListAPIView):
+    queryset = Property.objects.all()
+    serializer_class = UploadURLSerializer
+    filter_backends = [SearchFilter]
+    pagination_class = PageNumberPagination  # Add this line
+    pagination_class.page_size = 50
+    search_fields = ['url']
+
+
+class JobListView(generics.ListAPIView):
+    queryset = Job.objects.all().order_by('-id')
+    serializer_class = JobSerializer
+    pagination_class = PageNumberPagination  # Add this line
+    pagination_class.page_size = 50
 
 
 class RefreshSerializerViewSet(generics.ListCreateAPIView):
@@ -295,6 +314,22 @@ class FileUploadView(APIView):
 class PropertyListView(generics.ListAPIView):
     queryset = Property.objects.order_by('-added_at')
     serializer_class = UploadURLSerializer
+    pagination_class = PageNumberPagination  # Add this line
+    pagination_class.page_size = 50
+
+@api_view(['GET'])
+def stop_all_scraper(request):
+    props = Property.objects.filter(status='pending')
+    for prop in props:
+        prop.status = 'stopped'
+        prop.isProcessing = 0
+        prop.save()
+    units = Unit.objects.filter(Q(status='pending') | Q(status='scraped'))
+    for unit in units:
+        unit.status = 'stopped'
+        prop.isProcessing = 0
+        unit.save()
+    return Response('All scrapers stopped!')
 
 class PropertyView(APIView):
     serializer_class = UploadURLSerializer
@@ -361,6 +396,8 @@ class CrawlProperty(APIView):
                     prop.status = 'pending'
                     prop.isProcessing = 0
                     prop.save()
+                    units = Unit.objects.filter(property_id=url['id'])
+                    units.delete()
                 except:
                     serializer = UploadURLSerializer(data={'url': url['url'], 'status': url['status']})
                     if serializer.is_valid():

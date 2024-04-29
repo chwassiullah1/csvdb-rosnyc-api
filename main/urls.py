@@ -37,4 +37,7 @@ path('update_allconv/', views.UpdateConvertiblesView.as_view(), name='update_all
 path('schedule/', views.ScheduleViewSet.as_view(), name='schedule'),
 path('scheduleunit/', views.ScheduleUnitViewSet.as_view(), name='scheduleunit'),
 path('del_schedule/<int:pk>/', views.ScheduleDeleteView.as_view(), name='del_schedule'),
+path('stop_all_scraper/', views.stop_all_scraper),
+path('main_jobs/', views.JobListView.as_view(), name='main_jobs'),
+path('properties/search', views.PropertySearchAPIView.as_view(), name='properties-search')
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
