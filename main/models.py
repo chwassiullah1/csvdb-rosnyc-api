@@ -67,7 +67,7 @@ class Unit(models.Model):
         ('pending', 'pending'),
         ('scraped', 'scraped'),
     ]
-    url = models.URLField(unique=True)
+    url = models.URLField()
     title = models.CharField(max_length=100)
     unit = models.CharField(max_length=10,null=True)
     complete_title = models.CharField(max_length=150,null=True)
@@ -80,15 +80,42 @@ class Unit(models.Model):
     description = models.TextField(null=True)
     amenities = models.JSONField(null=True)
     added_at = models.DateTimeField(auto_now_add=True)
-    property = models.ForeignKey(Property, on_delete=models.CASCADE)
+    # property = models.ForeignKey(Property, on_delete=models.CASCADE)
     status = models.CharField(max_length=20, choices=CHOICE)
-    reality_user =  models.JSONField(default=[],null=True)
+    # reality_user =  models.JSONField(default=[],null=True)
     isProcessing = models.IntegerField(default=0)
     convertible = models.IntegerField(default=0)
+    job = models.ForeignKey('Jobs', on_delete=models.CASCADE, null=True)
+    job_status = models.CharField(max_length=20,default="running",null=True)
+    property = models.ForeignKey(Property, on_delete=models.CASCADE)
 
 
-class Job(models.Model):
+
+# class Job(models.Model):
+#     user = models.ForeignKey(RealityUser, on_delete=models.CASCADE, null=True)
+#     property_urls = models.JSONField(null=True)
+#     urls = models.JSONField(null=True)
+#     status = models.CharField(max_length=20, default='new')
+#     scraped_percentage = models.IntegerField(null=True, default=0)
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     updated_at = models.DateTimeField(auto_now=True)
+
+class Jobs(models.Model):
+    user = models.ForeignKey(RealityUser, on_delete=models.CASCADE, null=True)
     urls = models.JSONField(null=True)
+    status = models.CharField(max_length=20, default='new')
+    scraped_percentage = models.IntegerField(null=True, default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    isProcessing = models.IntegerField(default=0)
+
+class JobPropertyBridge(models.Model):
+    job = models.ForeignKey(Jobs, on_delete=models.CASCADE)
+    property = models.ForeignKey(Property, on_delete=models.CASCADE)
+    property_status = models.CharField(max_length=20, choices=Property.CHOICE,null=True)
+    last_update = models.DateTimeField(auto_now=True)
+    property_url = models.URLField(default="")
+
 
 class Refresh(models.Model):
     CHOICE = [

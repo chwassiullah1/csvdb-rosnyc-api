@@ -87,10 +87,11 @@ WSGI_APPLICATION = 'edwin_backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'edwinbackend',
-        'USER': 'remote_user',
-        'PASSWORD': '#1Kursi',
-        'HOST': '3.88.224.113',
+        'NAME': 'main_db',
+        'USER': 'root',
+        'PASSWORD': 'root',
+        # 'HOST': '3.88.224.113',
+        'HOST': '127.0.0.1',
         'PORT': '3306',
     }
 }

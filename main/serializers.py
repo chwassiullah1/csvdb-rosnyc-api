@@ -1,6 +1,6 @@
 # serializers.py
 from rest_framework import serializers
-from .models import Property, Unit, RealityUser, Job, TemplateDescription, Refresh, Schedule, Scheduleunits
+from .models import Property, Unit, RealityUser, Jobs, TemplateDescription, Refresh, Schedule, Scheduleunits
 
 
 class UploadURLSerializer(serializers.ModelSerializer):
@@ -46,8 +46,15 @@ class TemplateDescriptionSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class JobSerializer(serializers.ModelSerializer):
+    # user = RealityUserSerializer()
     class Meta:
-        model = Job
+        model = Jobs
+        fields = '__all__'
+
+class JobGetSerializer(serializers.ModelSerializer):
+    user = RealityUserSerializer(read_only=True)
+    class Meta:
+        model = Jobs
         fields = '__all__'
 
 

@@ -4,16 +4,18 @@ import time
 from django.utils import timezone
 from datetime import timedelta
 import requests
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
+from django.views.decorators.http import require_POST
 
 from edwin_backend import settings
 from scrapy import Selector
-from .models import Property, Unit, RealityUser, Job, TemplateDescription, Refresh, Schedule, Scheduleunits
+from .models import Property, Unit, RealityUser, Jobs, TemplateDescription, Refresh, Schedule, Scheduleunits
 # from .utils import scrape_property
 from .scrapy import scrape_unit,scrape_property, upload_item
 from rest_framework import viewsets
 from .serializers import UploadURLSerializer, UnitSerializer, GetURLSerializer, RealityUserSerializer, \
-    JobSerializer, TemplateDescriptionSerializer, RefreshSerializer, ScheduleSerializer, ScheduleUnitSerializer
+    JobSerializer, TemplateDescriptionSerializer, RefreshSerializer, ScheduleSerializer, ScheduleUnitSerializer, \
+    JobGetSerializer
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.decorators import api_view, parser_classes
@@ -58,13 +60,60 @@ class PropertySearchAPIView(generics.ListAPIView):
     search_fields = ['url']
 
 
-class JobListView(generics.ListAPIView):
-    queryset = Job.objects.all().order_by('-id')
-    serializer_class = JobSerializer
-    pagination_class = PageNumberPagination  # Add this line
-    pagination_class.page_size = 50
+# @require_POST
+class UpdateStatusAPIView(APIView):
+    # def post(self, request):
+    #     # Get job ID and status from the request data
+    #     job_id = request.data.get('job_id')
+    #     new_status = request.data.get('status')
+    #
+    #     # Update status in Jobs table
+    #     try:
+    #         job = Jobs.objects.get(id=job_id)
+    #         job.status = new_status
+    #         job.save()
+    #     except Jobs.DoesNotExist:
+    #         return Response({'message': 'Job not found'}, status=status.HTTP_404_NOT_FOUND)
+    #
+    #     # Update status in Unit table
+    #     units = Unit.objects.filter(job_id=job_id)
+    #     for unit in units:
+    #         unit.status = new_status
+    #         # unit.isProcessing = True
+    #         unit.save()
+    #
+    #     return Response({'message': 'Status updated successfully'})
+    def post(self, request):
+        # Get job ID and status from the request data
+        job_id = request.data.get('job_id')
+        new_status = request.data.get('status')
 
 
+        # Update status in Jobs table
+        try:
+            job = Jobs.objects.get(id=job_id)
+            if new_status == "paused":
+                job.status = "paused"
+            elif new_status == "pending":
+                if job.scraped_percentage < 100:
+                    job.status = "pending"
+                else:
+                    job.status = "scraped"
+            job.save()
+        except Jobs.DoesNotExist:
+            return Response({'message': 'Job not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Update status in Unit table
+        units = Unit.objects.filter(job_id=job_id)
+        for unit in units:
+            if new_status == "paused":
+                unit.job_status = "paused"
+            elif new_status == "pending":
+                unit.job_status = "running"
+            unit.save()
+
+
+        return Response({'message': 'Status updated successfully'})
 class RefreshSerializerViewSet(generics.ListCreateAPIView):
     queryset = Refresh.objects.all().order_by('-id')
     serializer_class = RefreshSerializer
@@ -189,24 +238,6 @@ class RemoveImageView(APIView):
 
         return JsonResponse(instance_data)
 
-
-
-
-
-
-
-# class UploadedImageCreateView(generics.CreateAPIView):
-#     queryset = Images.objects.all()
-#     serializer_class = ImageSerializer
-
-# class UploadedImageListView(generics.ListAPIView):
-#     serializer_class = ImageSerializer
-#
-#     def get_queryset(self):
-#         property_id = self.request.query_params.get('property_id')
-#         queryset = Images.objects.filter(property_id=property_id)
-#         return queryset
-
 class StreetImageListView(generics.ListAPIView):
     serializer_class = UnitSerializer
 
@@ -235,24 +266,45 @@ class JobDetailView(APIView):
     def get(self, request, job_id):
         print('request')
         try:
-            job_instance = Job.objects.get(id=job_id)
-        except Job.DoesNotExist:
+            job_instance = Jobs.objects.get(id=job_id)
+        except Jobs.DoesNotExist:
             return Response({'error': 'Job not found'}, status=status.HTTP_404_NOT_FOUND)
 
         serialized_data = JobSerializer(job_instance).data
         return Response(serialized_data)
 
 
-class JobViewSet(APIView):
+# class JobViewSet(APIView):
+#
+#     def post(self, request):
+#         print('data',request.data)
+#         id = None
+#         serializer = JobSerializer(data={'urls':request.data})
+#         if serializer.is_valid():
+#             id = serializer.save()
+#         serialized_data = JobSerializer(id).data
+#         return Response(serialized_data)
 
-    def post(self, request):
-        print('data',request.data)
-        id = None
-        serializer = JobSerializer(data={'urls':request.data})
-        if serializer.is_valid():
-            id = serializer.save()
-        serialized_data = JobSerializer(id).data
-        return Response(serialized_data)
+class JobViewSet(generics.ListCreateAPIView, generics.DestroyAPIView):
+    queryset = Jobs.objects.all().order_by('-id')
+
+    def get_serializer_class(self):
+        # Use different serializer for different actions
+        if self.request.method == 'GET':
+            return JobGetSerializer  # Serializer for GET requests
+        else:
+            return JobSerializer
+    # serializer_class = JobSerializer
+
+    def get(self, request, *args, **kwargs):
+        pk = kwargs.get('pk')
+        if pk:
+            # Retrieve a single object
+            job = get_object_or_404(self.get_queryset(), pk=pk)
+            serializer = self.get_serializer(job)
+            return Response(serializer.data)
+        # Otherwise list all objects
+        return super().get(request, *args, **kwargs)
 
 
 class ConvertiblePatchView(generics.UpdateAPIView):
@@ -317,6 +369,13 @@ class PropertyListView(generics.ListAPIView):
     pagination_class = PageNumberPagination  # Add this line
     pagination_class.page_size = 50
 
+class JobListView(generics.ListAPIView):
+    queryset = Jobs.objects.order_by('-id')
+    serializer_class = JobGetSerializer
+    pagination_class = PageNumberPagination  # Add this line
+    pagination_class.page_size = 50
+
+
 @api_view(['GET'])
 def stop_all_scraper(request):
     props = Property.objects.filter(status='pending')
@@ -373,16 +432,27 @@ class PropertyDeleteView(generics.DestroyAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class UnitListView(APIView):
-    # queryset = Property.objects.order_by('-added_at')[:10]
-    # serializer_class = GetURLSerializer
+# class UnitListView(APIView):
+#     # queryset = Property.objects.order_by('-added_at')[:10]
+#     # serializer_class = GetURLSerializer
+#
+#     def post(self, request):
+#         # Access the POST request data using request.data
+#         queryset = Property.objects.filter(url__in=request.data)
+#         serializer  = GetURLSerializer(queryset, many=True)
+#
+#         return Response(serializer.data,status=status.HTTP_200_OK)
 
-    def post(self, request):
-        # Access the POST request data using request.data
-        queryset = Property.objects.filter(url__in=request.data)
-        serializer  = GetURLSerializer(queryset, many=True)
 
-        return Response(serializer.data,status=status.HTTP_200_OK)
+class UnitsByJobId(APIView):
+    def get(self, request, job_id):
+        try:
+            units = Unit.objects.filter(job__id=job_id)
+            serializer = UnitSerializer(units, many=True)
+            return Response(serializer.data)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 class CrawlProperty(APIView):
@@ -396,8 +466,8 @@ class CrawlProperty(APIView):
                     prop.status = 'pending'
                     prop.isProcessing = 0
                     prop.save()
-                    units = Unit.objects.filter(property_id=url['id'])
-                    units.delete()
+                    # units = Unit.objects.filter(property_id=url['id'])
+                    # units.delete()
                 except:
                     serializer = UploadURLSerializer(data={'url': url['url'], 'status': url['status']})
                     if serializer.is_valid():
@@ -529,11 +599,26 @@ def edit_property(request, web_unit_url):
 class MultiUpdateProperty(APIView):
     def post(self, request):
         data = request.data
-        for url in data['url']:
-            prop = Unit.objects.get(url=url)
+        print('request.data', request.data)
+
+        first_unit_id = data['ids'][0]
+        first_unit = Unit.objects.get(id=first_unit_id)
+        job_id = first_unit.job_id
+
+        try:
+            job = Jobs.objects.get(id=job_id)
+            job.status = 'pending'
+            job.save()
+        except Jobs.DoesNotExist:
+            # Handle the case where the job with the given ID does not exist
+            return Response({'message': f'Job with ID {job_id} does not exist'}, status=status.HTTP_404_NOT_FOUND)
+
+        for id in data['ids']:
+            prop = Unit.objects.get(id=id)
             prop.status = 'pending'
+            prop.job_status = 'running'
             prop.isProcessing = 0
-            prop.reality_user = data['reality_user']
+            # prop.reality_user = data['reality_user']
             prop.save()
         return Response('Uploading Started')
 
