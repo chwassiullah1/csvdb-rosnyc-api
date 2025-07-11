@@ -124,22 +124,30 @@ def scrape_unit(unit_url):
     except:
         net_ef_rent = ''
     response = Selector(text=response.text)
+
     item = {'title': response.css(".building-title a::text").get('').split(" #")[0],
             'unit': response.css(".building-title a::text").get('').split(" #")[-1],
             'complete_title': response.css(".building-title a::text").get('')}
     raw_price = " ".join([i.strip() for i in response.css(".price *::text").extract() if i.strip()])
     beds = response.xpath("//div[@class='details_info']/ul/li[contains(text(),'bed')]/text()").get('')
-    item['beds'] = beds.replace('beds', '').replace('bed', '').strip()
+    print(f"beds {beds}")
+    if beds:
+        item['beds'] = beds.replace('beds', '').replace('bed', '').strip()
+        print(f"item beds {item['beds']}")
+    else:
+        item['beds'] = '0'
 
     baths = response.css(".last_detail_cell::text").get('').split(" ")[0]
     item['baths'] = baths
     raw_price = raw_price.replace(",", "")
     raw_price = ''.join(filter(str.isdigit, raw_price))
+    item['price'] = 0
     if net_ef_rent:
         net_ef_rent = net_ef_rent.replace(",", "").replace("$", "")
         item['price'] = float((int(net_ef_rent)))
     else:
-        item['price'] = float((int(raw_price)))
+        if raw_price:
+            item['price'] = float(int(raw_price))
     item['image_urls'] = ','.join(
         [x for x in response.css('.jsFlickityImageWrapper img::attr(data-src-original)').extract()])
     item['image_paths'] = [f"images/{count + 1}.jpg" for count in

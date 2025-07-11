@@ -1,6 +1,6 @@
 # serializers.py
 from rest_framework import serializers
-from .models import Property, Unit, RealityUser, Jobs, TemplateDescription, Refresh, Schedule, Scheduleunits
+from .models import Property, Unit, RealityUser, Jobs, TemplateDescription, Refresh, Schedule, Scheduleunits, WebTitle
 
 
 class UploadURLSerializer(serializers.ModelSerializer):
@@ -51,11 +51,26 @@ class JobSerializer(serializers.ModelSerializer):
         model = Jobs
         fields = '__all__'
 
+# class JobGetSerializer(serializers.ModelSerializer):
+#     user = RealityUserSerializer(read_only=True)
+#     class Meta:
+#         model = Jobs
+#         fields = '__all__'
+
 class JobGetSerializer(serializers.ModelSerializer):
     user = RealityUserSerializer(read_only=True)
+    urls = serializers.SerializerMethodField()
+
     class Meta:
         model = Jobs
         fields = '__all__'
+
+    def get_urls(self, obj):
+        urls = obj.urls
+        if len(urls) > 10:
+            summary_sentence = f"There are {len(urls)} property urls in this job"
+            return urls[:10] + [summary_sentence]
+        return urls
 
 
 class GetURLSerializer(serializers.ModelSerializer):
@@ -69,3 +84,17 @@ class GetURLSerializer(serializers.ModelSerializer):
         serializer = UnitSerializer(units, many=True)
         return serializer.data
 
+class WebTitleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WebTitle
+        fields = ['id', 'web_title']
+
+class PropertySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Property
+        fields = ['id', 'url']
+
+class UnitFilterSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Unit
+        fields = ['id']

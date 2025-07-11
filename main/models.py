@@ -12,13 +12,20 @@ class Property(models.Model):
         ('template', 'template'),
         ('costume', 'costume')
     ]
+    WEBTITLECHOICE = [
+        ('streeteasy', 'streeteasy'),
+        ('template', 'template'),
+        ('costume', 'costume')
+    ]
     url = models.URLField(unique=True)
     added_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     status = models.CharField(max_length=20, choices=CHOICE)
-    use_desc = models.CharField(max_length=20, choices=DESCCHOICE, default='streeteasy')
+    use_desc = models.CharField(max_length=20, choices=DESCCHOICE, default='template')
+    web_title = models.CharField(max_length=20, choices=WEBTITLECHOICE, default='template')
     isProcessing = models.IntegerField(default=0)
     area = models.CharField(max_length=50,default=None,null=True)
+    prop_type = models.CharField(max_length=30, default=None, null=True)
     neighbour = models.JSONField(default={
         "Manhattan": [],
         "Brooklyn": [],
@@ -60,6 +67,12 @@ class RealityUser(models.Model):
 class TemplateDescription(models.Model):
     description = models.CharField(max_length=3000)
 
+class WebTitle(models.Model):
+    web_title = models.CharField(max_length=124, unique=True)  # Add unique=True here
+
+    def __str__(self):
+        return self.web_title
+
 
 class Unit(models.Model):
     CHOICE = [
@@ -71,7 +84,7 @@ class Unit(models.Model):
     title = models.CharField(max_length=100)
     unit = models.CharField(max_length=10,null=True)
     complete_title = models.CharField(max_length=150,null=True)
-    beds = models.CharField(max_length=20)
+    beds = models.CharField(max_length=20, null=True)
     baths = models.CharField(max_length=15)
     price = models.CharField(max_length=10)
     listing_id = models.IntegerField(null=True, default=None)
@@ -88,6 +101,13 @@ class Unit(models.Model):
     job = models.ForeignKey('Jobs', on_delete=models.CASCADE, null=True)
     job_status = models.CharField(max_length=20,default="running",null=True)
     property = models.ForeignKey(Property, on_delete=models.CASCADE)
+    unit_type = models.CharField(max_length=30, default='')
+    # sample = models.IntegerField(default=0)
+
+
+    def __str__(self):
+        return f"Unit (id={self.id}, price={self.price}, job_id={self.job_id})"
+
 
 
 
@@ -108,6 +128,7 @@ class Jobs(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     isProcessing = models.IntegerField(default=0)
+    unit_ids = models.JSONField(blank=True, default=list)
 
 class JobPropertyBridge(models.Model):
     job = models.ForeignKey(Jobs, on_delete=models.CASCADE)
