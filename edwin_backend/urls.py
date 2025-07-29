@@ -23,6 +23,7 @@ from django.views.static import serve
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('main.urls')),
+    path('agents/', include('agents.urls')),
     re_path(r'^external_images/(?P<path>.*)$', serve, {
         'document_root': 'C:/Users/Administrator/Desktop/edwin_scrapers/images/',
     }),
