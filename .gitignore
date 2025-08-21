@@ -1,3 +1,4 @@
 /uploads
 /images
 /staticfiles
+/__pycache__
