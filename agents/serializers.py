@@ -9,8 +9,9 @@ class SyncHistorySerializer(serializers.ModelSerializer):
 
 
 class AgentSerializer(serializers.ModelSerializer):
-    sync_history = SyncHistorySerializer(many=True, read_only=True)
+    history = SyncHistorySerializer(many=True, read_only=True)
 
     class Meta:
         model = Agent
         fields = "__all__"
+
