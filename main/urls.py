@@ -28,6 +28,7 @@ path('upload_image/', views.UploadImageView.as_view(), name='upload_image'),
 path('del_image/', views.RemoveImageView.as_view(), name='del_image'),
 path('update_image/', views.UpdateImageView.as_view(), name='update_image'),
 path('get_users/', views.RealityUserListView.as_view(), name='get_users'),
+path('automated_ads', views.automated_ads, name='automated_ads'),
 path('del_user/<int:pk>/', views.RealityUserDeleteView.as_view(), name='del_user'),
 path('getstreet_img/', views.StreetImageListView.as_view(), name='getstreet_img'),
 path('refresh/', views.RefreshSerializerViewSet.as_view(), name='refresh'),
@@ -48,4 +49,8 @@ path('web-titles/', views.WebTitleListCreateView.as_view(), name='web-title-list
 path('web-titles/<int:pk>/', views.WebTitleRetrieveUpdateDestroyView.as_view(), name='web-title-detail'),
 path('properties/filter', views.PropertyFilterAPI.as_view(), name='property-filter'),
 path('units/filter', views.UnitFilterAPI.as_view(), name='property-filter'),
+path('all_automated_results/',views.all_automated_results,name='all_automated_results'),
+path("task/<str:task_id>/", views.automated_task_detail, name="automated_task_detail"),
+path("task/schedule/", views.schedule_task, name="schedule_task"),
+
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

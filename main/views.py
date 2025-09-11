@@ -3,7 +3,7 @@ import os
 import re
 import time
 from django.utils import timezone
-from datetime import timedelta
+from datetime import datetime, timedelta
 import requests
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
@@ -368,7 +368,6 @@ class JobViewSet(generics.ListCreateAPIView, generics.DestroyAPIView):
         # Otherwise list all objects
         return super().get(request, *args, **kwargs)
 
-    import re
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -1445,4 +1444,127 @@ class UnitFilterAPI(generics.ListAPIView):
         }, status=status.HTTP_200_OK)
 
 
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import json
+from .tasks import run_automated_ads
+from .models import AutomatedTask
 
+@csrf_exempt
+def automated_ads(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body.decode("utf-8"))
+            account = data.get("account")
+            neighborhoods = data.get("neighborhoods", [])
+            unit_types = data.get("unit_types", [])
+            ads_per_neighborhood = data.get("ads_per_neighborhood")
+            building_cap = data.get("building_cap")
+            cap_mapping = {
+                "One ad per building (per bedroom size)": 1,
+                "One ad per building (total)": 2,
+            }
+            building_cap_value = cap_mapping.get(building_cap, 0)
+            task = run_automated_ads.delay(account, neighborhoods, unit_types, ads_per_neighborhood, building_cap)
+            AutomatedTask.objects.create(
+                            task_id=task.id,
+                            status="READY",
+                            account=account,
+                            neighborhoods=neighborhoods,
+                            unit_types=unit_types,
+                            ads_per_neighborhood=ads_per_neighborhood,
+                            building_cap=building_cap_value,
+                            logs=[],
+                            result={}
+                        )            
+            return JsonResponse({
+                "message": "Automated ads task started!",
+                "task_id": task.id
+            }, status=200)
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=400)
+
+    return JsonResponse({"error": "Invalid request method"}, status=405)
+
+
+def all_automated_results(request):
+    tasks = AutomatedTask.objects.order_by("-created_at").values()
+    return JsonResponse(list(tasks), safe=False)
+
+
+def automated_task_detail(request, task_id):
+    """
+    Return full details of a single task
+    """
+    try:
+        task = get_object_or_404(AutomatedTask, task_id=task_id)
+
+        data = {
+            "id": task.id,
+            "task_id": task.task_id,
+            "status": task.status,
+            "account": task.account,
+            "neighborhoods": task.neighborhoods,
+            "unit_types": task.unit_types,
+            "ads_per_neighborhood": task.ads_per_neighborhood,
+            "building_cap": task.building_cap,
+            "logs": task.logs,
+            "result": task.result,
+            "created_at": task.created_at,
+        }
+
+        return JsonResponse(data, safe=False, status=200)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+    
+
+@csrf_exempt
+def schedule_task(request):
+    """
+    Schedule a task for the future
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "Invalid method"}, status=405)
+
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+        account = data.get("account")
+        neighborhoods = data.get("neighborhoods", [])
+        unit_types = data.get("unit_types", [])
+        ads_per_neighborhood = data.get("ads_per_neighborhood")
+        building_cap = data.get("building_cap")
+        schedule_time = data.get("schedule_time")  # ISO string, e.g. "2025-09-01T18:00:00"
+
+        cap_mapping = {
+            "One ad per building (per bedroom size)": 1,
+            "One ad per building (total)": 2,
+        }
+        building_cap_value = cap_mapping.get(building_cap, 0)
+
+        eta = datetime.fromisoformat(schedule_time) if schedule_time else datetime.utcnow() + timedelta(seconds=10)
+
+        task = run_automated_ads.apply_async(
+            args=(account, neighborhoods, unit_types, ads_per_neighborhood, building_cap_value),
+            eta=eta
+        )
+
+        AutomatedTask.objects.create(
+            task_id=task.id,
+            status="SCHEDULED",
+            account=account,
+            neighborhoods=neighborhoods,
+            unit_types=unit_types,
+            ads_per_neighborhood=ads_per_neighborhood,
+            building_cap=building_cap_value,
+            logs=["Task scheduled for future run"],
+            result={},
+        )
+
+        return JsonResponse({
+            "message": f"Task scheduled for {eta.isoformat()}",
+            "task_id": task.id
+        }, status=200)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)

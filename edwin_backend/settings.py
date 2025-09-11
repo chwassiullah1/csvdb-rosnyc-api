@@ -88,10 +88,10 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'main_db',
-        'USER': 'root',
-        'PASSWORD': 'root',
+        'USER': 'hamza',
+        'PASSWORD': 'hamza123',
         # 'HOST': '3.88.224.113',
-        'HOST': '127.0.0.1',
+        'HOST': '3.12.192.194',
         'PORT': '3306',
     }
 }
@@ -139,3 +139,6 @@ MEDIA_URL = '/files/'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+CELERY_BROKER_URL = "redis://localhost:6379/0"
+CELERY_RESULT_BACKEND = "redis://localhost:6379/0"
+

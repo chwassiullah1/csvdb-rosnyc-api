@@ -1,3 +1,5 @@
 /uploads
 /images
 /staticfiles
+__pycache__/
+*.pyc
