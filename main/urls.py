@@ -51,6 +51,6 @@ path('properties/filter', views.PropertyFilterAPI.as_view(), name='property-filt
 path('units/filter', views.UnitFilterAPI.as_view(), name='property-filter'),
 path('all_automated_results/',views.all_automated_results,name='all_automated_results'),
 path("task/<str:task_id>/", views.automated_task_detail, name="automated_task_detail"),
-path("task/schedule/", views.schedule_task, name="schedule_task"),
+path("task/<str:task_id>/schedule/", views.schedule_task, name="schedule_task"),
 
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

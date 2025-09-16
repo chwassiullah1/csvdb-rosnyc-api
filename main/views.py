@@ -1458,6 +1458,7 @@ def automated_ads(request):
             account = data.get("account")
             neighborhoods = data.get("neighborhoods", [])
             unit_types = data.get("unit_types", [])
+            apartment_types = data.get("apartment_types", [])
             ads_per_neighborhood = data.get("ads_per_neighborhood")
             building_cap = data.get("building_cap")
             cap_mapping = {
@@ -1465,13 +1466,14 @@ def automated_ads(request):
                 "One ad per building (total)": 2,
             }
             building_cap_value = cap_mapping.get(building_cap, 0)
-            task = run_automated_ads.delay(account, neighborhoods, unit_types, ads_per_neighborhood, building_cap)
+            task = run_automated_ads.delay(account, neighborhoods, unit_types,apartment_types, ads_per_neighborhood, building_cap)
             AutomatedTask.objects.create(
                             task_id=task.id,
                             status="READY",
                             account=account,
                             neighborhoods=neighborhoods,
                             unit_types=unit_types,
+                            apartment_types=apartment_types,
                             ads_per_neighborhood=ads_per_neighborhood,
                             building_cap=building_cap_value,
                             logs=[],
@@ -1518,52 +1520,34 @@ def automated_task_detail(request, task_id):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)
     
-
 @csrf_exempt
-def schedule_task(request):
-    """
-    Schedule a task for the future
-    """
+def schedule_task(request, task_id): 
     if request.method != "POST":
         return JsonResponse({"error": "Invalid method"}, status=405)
 
     try:
         data = json.loads(request.body.decode("utf-8"))
-        account = data.get("account")
-        neighborhoods = data.get("neighborhoods", [])
-        unit_types = data.get("unit_types", [])
-        ads_per_neighborhood = data.get("ads_per_neighborhood")
-        building_cap = data.get("building_cap")
-        schedule_time = data.get("schedule_time")  # ISO string, e.g. "2025-09-01T18:00:00"
+        schedule_time = data.get("schedule_time")  # ISO string
 
-        cap_mapping = {
-            "One ad per building (per bedroom size)": 1,
-            "One ad per building (total)": 2,
-        }
-        building_cap_value = cap_mapping.get(building_cap, 0)
+        interval_sec = data.get("interval_sec")    # optional for recurring
+        try:
+            task = AutomatedTask.objects.get(task_id=task_id)
+        except AutomatedTask.DoesNotExist:
+            return JsonResponse({"error": "Task not found"}, status=404)
 
+        # Parse schedule_time or fallback
         eta = datetime.fromisoformat(schedule_time) if schedule_time else datetime.utcnow() + timedelta(seconds=10)
 
-        task = run_automated_ads.apply_async(
-            args=(account, neighborhoods, unit_types, ads_per_neighborhood, building_cap_value),
-            eta=eta
-        )
-
-        AutomatedTask.objects.create(
-            task_id=task.id,
-            status="SCHEDULED",
-            account=account,
-            neighborhoods=neighborhoods,
-            unit_types=unit_types,
-            ads_per_neighborhood=ads_per_neighborhood,
-            building_cap=building_cap_value,
-            logs=["Task scheduled for future run"],
-            result={},
-        )
+        if interval_sec:
+            task.schedule_interval = interval_sec
+        task.status = "SCHEDULED"
+        task.scheduled = eta
+        task.logs['general'].append(f"Task scheduled for {eta.isoformat()}")
+        task.save(update_fields=["status", "scheduled", "logs", "schedule_interval"])
 
         return JsonResponse({
-            "message": f"Task scheduled for {eta.isoformat()}",
-            "task_id": task.id
+            "message": f"Task {task_id} scheduled for {eta.isoformat()}",
+            "task_id": task_id
         }, status=200)
 
     except Exception as e:

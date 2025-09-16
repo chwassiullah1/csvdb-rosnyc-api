@@ -199,6 +199,7 @@ class AutomatedTask(models.Model):
     account = models.JSONField(default=dict, blank=True, null=True)
     neighborhoods = models.JSONField(default=list, blank=True, null=True)
     unit_types = models.JSONField(default=list, blank=True, null=True)
+    apartment_types = models.JSONField(default=list, blank=True, null=True)
     ads_per_neighborhood = models.IntegerField(blank=True, null=True)
     building_cap = models.IntegerField(blank=True, null=True)
     logs = models.JSONField(default=dict, blank=True, null=True)  
@@ -207,5 +208,7 @@ class AutomatedTask(models.Model):
     last_run = models.DateTimeField(blank=True, null=True)
     scheduled = models.DateTimeField(blank=True, null=True)
     last_result = models.JSONField(default=list,null=True,blank=True)
+    schedule_interval = models.IntegerField(blank=True, null=True)  
+
     def __str__(self):
         return f"Task {self.task_id} - {self.status}"
