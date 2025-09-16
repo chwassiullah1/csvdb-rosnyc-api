@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 
 @shared_task(bind=True)
-def run_automated_ads(self, account, neighborhoods, unit_types, ads_per_neighborhood, building_cap):
+def run_automated_ads(self, account, neighborhoods, unit_types,apartment_types, ads_per_neighborhood, building_cap):
     def save_log(message, neighborhood=None, status=None, result=None):
         task, _ = AutomatedTask.objects.get_or_create(task_id=self.request.id)
 
