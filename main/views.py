@@ -1464,6 +1464,7 @@ def automated_ads(request):
             building_cap = data.get("building_cap")
             category = data.get("category","Open")
             marketplaces = data.get("marketplaces",[])
+            property_status = data.get("property_status")
             cap_mapping = {
                 "One ad per building (per bedroom size)": 1,
                 "One ad per building (total)": 2,
@@ -1481,6 +1482,7 @@ def automated_ads(request):
                             building_cap=building_cap_value,
                             category=category,
                             marketplaces=marketplaces,
+                            property_status = property_status,
                             logs=[],
                             result={}
                         )            
@@ -1521,6 +1523,10 @@ def automated_task_detail(request, task_id):
             "created_at": task.created_at,
             "interval": task.schedule_interval,
             "scheduled": task.scheduled,
+            "property_status": task.property_status,
+            "apartment_types": task.apartment_types,
+            "marketplaces": task.marketplaces,
+            "category": task.category,
         }
 
         return JsonResponse(data, safe=False, status=200)
