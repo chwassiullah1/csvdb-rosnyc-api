@@ -1449,6 +1449,7 @@ from django.views.decorators.csrf import csrf_exempt
 import json
 from .tasks import run_automated_ads
 from .models import AutomatedTask
+from django.db import connection
 
 @csrf_exempt
 def automated_ads(request):
@@ -1461,6 +1462,8 @@ def automated_ads(request):
             apartment_types = data.get("apartment_types", [])
             ads_per_neighborhood = data.get("ads_per_neighborhood")
             building_cap = data.get("building_cap")
+            category = data.get("category","Open")
+            marketplaces = data.get("marketplaces",[])
             cap_mapping = {
                 "One ad per building (per bedroom size)": 1,
                 "One ad per building (total)": 2,
@@ -1476,6 +1479,8 @@ def automated_ads(request):
                             apartment_types=apartment_types,
                             ads_per_neighborhood=ads_per_neighborhood,
                             building_cap=building_cap_value,
+                            category=category,
+                            marketplaces=marketplaces,
                             logs=[],
                             result={}
                         )            
@@ -1514,6 +1519,8 @@ def automated_task_detail(request, task_id):
             "logs": task.logs,
             "result": task.result,
             "created_at": task.created_at,
+            "interval": task.schedule_interval,
+            "scheduled": task.scheduled,
         }
 
         return JsonResponse(data, safe=False, status=200)
@@ -1542,13 +1549,71 @@ def schedule_task(request, task_id):
             task.schedule_interval = interval_sec
         task.status = "SCHEDULED"
         task.scheduled = eta
-        task.logs['general'].append(f"Task scheduled for {eta.isoformat()}")
-        task.save(update_fields=["status", "scheduled", "logs", "schedule_interval"])
+        # task.logs['general'].append(f"Task scheduled for {eta.isoformat()}")
+        task.save(update_fields=["status", "scheduled", "schedule_interval"])
 
         return JsonResponse({
             "message": f"Task {task_id} scheduled for {eta.isoformat()}",
             "task_id": task_id
         }, status=200)
 
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+@csrf_exempt
+def delete_automated_task(request, task_id):
+    """
+    Delete an AutomatedTask
+    """
+    if request.method != "DELETE":
+        return JsonResponse({"error": "Invalid request method"}, status=405)
+
+    try:
+        task = get_object_or_404(AutomatedTask, task_id=task_id)
+        task.delete()
+        return JsonResponse({"message": f"Task {task_id} deleted successfully!"}, status=200)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+    
+@csrf_exempt
+def pause_automated_task(request, task_id):
+    """
+    Update an AutomatedTask status to 'paused'
+    """
+    if request.method != "PATCH":
+        return JsonResponse({"error": "Invalid request method"}, status=405)
+
+    try:
+        task = get_object_or_404(AutomatedTask, task_id=task_id)
+        task.status = "PAUSED"
+        task.scheduled = None
+        task.schedule_interval = None
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE automated_property SET status = %s WHERE task_id = %s",
+                ["PAUSED", task.id],
+            )
+        task.save(update_fields=["status", "scheduled", "schedule_interval"])
+        return JsonResponse({"message": f"Task {task_id} paused successfully!"}, status=200)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+    
+@csrf_exempt
+def resume_automated_task(request, task_id):
+    """
+    Update an AutomatedTask status to 'running'
+    """
+    if request.method != "PATCH":
+        return JsonResponse({"error": "Invalid request method"}, status=405)
+
+    try:
+        task = get_object_or_404(AutomatedTask, task_id=task_id)
+        task.status = "PENDING"
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE automated_property SET status = %s WHERE task_id = %s",
+                ["PENDING", task.id],
+            )
+        task.save(update_fields=["status"])
+        return JsonResponse({"message": f"Task {task_id} resumed successfully!"}, status=200)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)

@@ -26,29 +26,35 @@ class Property(models.Model):
     isProcessing = models.IntegerField(default=0)
     area = models.CharField(max_length=50,default=None,null=True)
     prop_type = models.CharField(max_length=30, default=None, null=True)
-    neighbour = models.JSONField(default={
-        "Manhattan": [],
-        "Brooklyn": [],
-        "Queens": [],
-        "Bronx": [],
-        "Staten_Island": [],
-        "Others": []
-    })
+    def default_neighbour():
+        return {
+            "Manhattan": [],
+            "Brooklyn": [],
+            "Queens": [],
+            "Bronx": [],
+            "Staten_Island": [],
+            "Others": []
+        }
+
+    def default_images():
+        return {
+            'bathroom': {'unfurnished': [], 'furnished': []},
+            'bedroom': {'unfurnished': [], 'furnished': []},
+            'livingroom': {'unfurnished': [], 'furnished': []},
+            'kitchen': {'unfurnished': [], 'furnished': []},
+            'more': {'unfurnished': [], 'furnished': []},
+            'gym': {'unfurnished': [], 'furnished': []},
+            'lobby': {'unfurnished': [], 'furnished': []},
+            'lounge': {'unfurnished': [], 'furnished': []},
+            'roof_deck': {'unfurnished': [], 'furnished': []},
+            'pool': {'unfurnished': [], 'furnished': []},
+            'golf_room': {'unfurnished': [], 'furnished': []},
+            'others': {'unfurnished': [], 'furnished': []},
+        }
+
+    neighbour = models.JSONField(default=default_neighbour)
+    images = models.JSONField(default=default_images)
     upload_img = models.BooleanField(default=False)
-    images = models.JSONField(default={
-        'bathroom': {'unfurnished': [], 'furnished': []},
-        'bedroom': {'unfurnished': [], 'furnished': []},
-        'livingroom': {'unfurnished': [], 'furnished': []},
-        'kitchen': {'unfurnished': [], 'furnished': []},
-        'more': {'unfurnished': [], 'furnished': []},
-        'gym': {'unfurnished': [], 'furnished': []},
-        'lobby': {'unfurnished': [], 'furnished': []},
-        'lounge': {'unfurnished': [], 'furnished': []},
-        'roof_deck': {'unfurnished': [], 'furnished': []},
-        'pool': {'unfurnished': [], 'furnished': []},
-        'golf_room': {'unfurnished': [], 'furnished': []},
-        'others': {'unfurnished': [], 'furnished': []},
-    })
     description = models.JSONField(default=list)
 
 # class Images(models.Model):
@@ -145,7 +151,7 @@ class Refresh(models.Model):
     ]
     refresh_at = models.DateTimeField()
     status = models.CharField(max_length=20, choices=CHOICE)
-    reality_user =  models.JSONField(default=[],null=True)
+    reality_user =  models.JSONField(default=list,null=True)
 
 
 
@@ -156,9 +162,9 @@ class Schedule(models.Model):
         ('scraped', 'scraped')
     ]
     added_at = models.DateTimeField(auto_now_add=True)
-    property_id = models.JSONField(default=[], null=True)
+    property_id = models.JSONField(default=list, null=True)
     single_schedule = models.DateTimeField()
-    filters = models.JSONField(default={}, null=True)
+    filters = models.JSONField(default=dict, null=True)
     reality_user = models.IntegerField()
     status = models.CharField(max_length=20, choices=CHOICE)
     day = models.CharField(max_length=20,default='',blank=True)
@@ -186,7 +192,7 @@ class Scheduleunits(models.Model):
     property = models.ForeignKey(Property, on_delete=models.CASCADE)
     schedule = models.ForeignKey(Schedule, on_delete=models.CASCADE)
     status = models.CharField(max_length=20, choices=CHOICE)
-    reality_user =  models.JSONField(default=[],null=True)
+    reality_user =  models.JSONField(default=list,null=True)
     isProcessing = models.IntegerField(default=0)
     convertible = models.IntegerField(default=0)
     
@@ -207,8 +213,10 @@ class AutomatedTask(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     last_run = models.DateTimeField(blank=True, null=True)
     scheduled = models.DateTimeField(blank=True, null=True)
+    no_of_runs = models.IntegerField(default=0)
     last_result = models.JSONField(default=list,null=True,blank=True)
     schedule_interval = models.IntegerField(blank=True, null=True)  
-
+    category = models.CharField(max_length=100, default="Open", blank=True, null=True)
+    marketplaces = models.JSONField(default=list, blank=True, null=True)
     def __str__(self):
         return f"Task {self.task_id} - {self.status}"
