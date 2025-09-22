@@ -218,5 +218,6 @@ class AutomatedTask(models.Model):
     schedule_interval = models.IntegerField(blank=True, null=True)  
     category = models.CharField(max_length=100, default="Open", blank=True, null=True)
     marketplaces = models.JSONField(default=list, blank=True, null=True)
+    property_status = models.CharField(max_length=20, default="For Sale", blank=True, null=True)
     def __str__(self):
         return f"Task {self.task_id} - {self.status}"
