@@ -10,13 +10,13 @@ from django.views.decorators.http import require_POST
 
 from edwin_backend import settings
 from scrapy import Selector
-from .models import Property, Unit, RealityUser, Jobs, TemplateDescription, Refresh, Schedule, Scheduleunits, WebTitle
+from .models import Property, Unit, RealityUser, Jobs, TemplateDescription, Refresh, Schedule, Scheduleunits, WebTitle, NewUnit
 # from .utils import scrape_property
 from .scrapy import scrape_unit,scrape_property, upload_item
 from rest_framework import viewsets
 from .serializers import UploadURLSerializer, UnitSerializer, GetURLSerializer, RealityUserSerializer, \
     JobSerializer, TemplateDescriptionSerializer, RefreshSerializer, ScheduleSerializer, ScheduleUnitSerializer, \
-    JobGetSerializer, WebTitleSerializer, PropertySerializer, UnitFilterSerializer
+    JobGetSerializer, WebTitleSerializer, PropertySerializer, UnitFilterSerializer, NewUnitFilterSerializer
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.decorators import api_view, parser_classes
@@ -38,6 +38,10 @@ from rest_framework.filters import SearchFilter
 from django.db.models import F, FloatField
 from django.db.models.functions import Cast
 from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
+from django.db.models import Q, F, FloatField
+from django.db.models.functions import Cast
+import re
+import traceback
 
 class CustomPagination(PageNumberPagination):
     page_size = 100  # Set the page size to 500
@@ -630,7 +634,201 @@ class PropertyDeleteView(generics.DestroyAPIView):
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+def _is_numeric(value) -> bool:
+    try:
+        float(value)
+        return True
+    except (TypeError, ValueError):
+        return False
 
+
+class FilteredPropertyView(APIView):
+    def get(self, request):
+        try:
+            def safe_int(value, default):
+                try:
+                    return int(value)
+                except (TypeError, ValueError):
+                    return default
+
+            queryset = (
+                NewUnit.objects
+                .select_related('property')
+                .order_by('unit_category')
+                .exclude(image_urls__isnull=True)
+                .exclude(image_urls='')
+            )
+
+            # Query params
+            neighborhood = request.query_params.get('neighborhood')
+            bathroom_counts = request.query_params.get('bathroom_counts')
+            apartment_type = request.query_params.get('apartment_type')
+            min_budget = request.query_params.get('minBudget')
+            max_budget = request.query_params.get('maxBudget')
+            page = safe_int(request.query_params.get('page'), 1)
+            page_size = safe_int(request.query_params.get('page_size'), 150)
+            unit_category = request.query_params.get('unit_category')
+
+            # Neighborhood filter
+            if neighborhood:
+                neighborhoods = [n.strip() for n in neighborhood.split(',') if n.strip()]
+                if neighborhoods:
+                    q_filter = Q()
+                    for n in neighborhoods:
+                        q_filter |= Q(property__area__iexact=n)
+                    queryset = queryset.filter(q_filter)
+
+            # Bathroom filter
+            if bathroom_counts:
+                baths = safe_int(bathroom_counts, None)
+                if baths is not None:
+                    queryset = queryset.filter(baths=baths)
+
+            # Apartment type / bedroom count filter
+            if apartment_type:
+                apartment_type = apartment_type.strip()
+
+                bedroom_map = {
+                    'Studio': [0],
+                    'Flex 1': [0, 1],
+                    'Flex 2': [1, 2],
+                    'Flex 3': [1, 2],
+                    'Flex 4': [2, 3],
+                    '1 bedroom': [1],
+                    '2 bedroom': [2],
+                    '3 bedroom': [3],
+                    '4 bedroom': [4],
+                }
+
+                bed_values = bedroom_map.get(apartment_type)
+
+                if bed_values:
+                    queryset = queryset.filter(beds__in=bed_values)
+
+
+
+            # Unit category filter                                                                                                                                   
+            if unit_category:     
+                unit_cat = safe_int(unit_category, None)                                                                                                             
+                if unit_cat is not None:                              
+                    queryset = queryset.filter(unit_category=unit_cat)
+
+            # Budget filter
+            if min_budget or max_budget:
+                min_price = safe_int(min_budget, 0)
+                max_price = safe_int(max_budget, 999999)
+
+                def _parse_currency(value) -> float | None:
+                    if not value:
+                        return None
+                    cleaned = re.sub(r'[^\d.]', '', str(value).replace(',', ''))
+                    try:
+                        return float(cleaned) if cleaned else None
+                    except ValueError:
+                        return None
+
+                # price field (dirty numeric string)
+                valid_price_ids = {
+                    unit['id']
+                    for unit in queryset.values('id', 'price')
+                    if _is_numeric(unit['price'])
+                }
+
+                # estimated_payment field (formatted like "$6,021 /mo") — parse in Python
+                matching_estimated_ids = {
+                    unit['id']
+                    for unit in queryset.values('id', 'estimated_payment')
+                    if (parsed := _parse_currency(unit['estimated_payment'])) is not None
+                    and min_price <= parsed <= max_price
+                }
+
+                # Units with no parseable price field at all — don't exclude them
+                no_price_ids = {
+                    unit['id']
+                    for unit in queryset.values('id', 'price', 'estimated_payment')
+                    if not _is_numeric(unit['price'])
+                    and _parse_currency(unit['estimated_payment']) is None
+                }
+
+                queryset = (
+                    queryset
+                    .filter(id__in=(valid_price_ids | matching_estimated_ids | no_price_ids))
+                    .annotate(
+                        price_numeric=Case(
+                            When(id__in=valid_price_ids, then=Cast(F('price'), FloatField())),
+                            default=Value(None),
+                            output_field=FloatField(),
+                        ),
+                    )
+                    .filter(
+                        Q(price_numeric__gte=min_price, price_numeric__lte=max_price) |
+                        Q(id__in=matching_estimated_ids) |
+                        Q(id__in=no_price_ids)  # pass through units with no price data
+                    )
+                )
+
+            # Pagination
+            page = max(page, 1)
+            page_size = max(min(page_size, 150), 1)
+
+            total = queryset.count()
+            start = (page - 1) * page_size
+            end = start + page_size
+
+            serializer = NewUnitFilterSerializer(queryset[start:end], many=True)
+
+            return Response(
+                {
+                    'total': total,
+                    'page': page,
+                    'page_size': page_size,
+                    'results': serializer.data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            return Response(
+                {
+                    'error': str(e),
+                    'trace': traceback.format_exc().splitlines(),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+
+class GetPropsByIdsView(APIView):
+    def get(self, request):
+        try:
+            ids_param = request.query_params.get('ids', '').strip()
+            if not ids_param:
+                return Response({'error': 'ids parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            ids = [int(i.strip()) for i in ids_param.split(',') if i.strip().isdigit()]
+            if not ids:
+                return Response({'error': 'No valid IDs provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+            queryset = (
+                NewUnit.objects
+                .select_related('property')
+                .filter(id__in=ids)
+            )
+
+            serializer = NewUnitFilterSerializer(queryset, many=True)
+
+            return Response(
+                {'results': serializer.data},
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            return Response(
+                {
+                    'error': str(e),
+                    'trace': traceback.format_exc().splitlines(),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 # class UnitListView(APIView):
 #     # queryset = Property.objects.order_by('-added_at')[:10]
 #     # serializer_class = GetURLSerializer

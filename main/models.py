@@ -115,7 +115,44 @@ class Unit(models.Model):
         return f"Unit (id={self.id}, price={self.price}, job_id={self.job_id})"
 
 
+class NewUnit(models.Model):
+    CHOICE = [
+        ('new', 'new'),
+        ('pending', 'pending'),
+        ('scraped', 'scraped'),
+    ]
+    url = models.URLField()
+    title = models.CharField(max_length=100)
+    unit = models.CharField(max_length=10,null=True)
+    complete_title = models.CharField(max_length=150,null=True)
+    beds = models.CharField(max_length=20, null=True)
+    baths = models.CharField(max_length=15)
+    price = models.CharField(max_length=10)
+    listing_id = models.IntegerField(null=True, default=None)
+    image_urls = models.TextField(null=True)
+    image_paths = models.JSONField(null=True)
+    description = models.TextField(null=True)
+    amenities = models.JSONField(null=True)
+    added_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=CHOICE)
+    isProcessing = models.IntegerField(default=0)
+    convertible = models.IntegerField(default=0)
+    job = models.ForeignKey('Jobs', on_delete=models.CASCADE, null=True)
+    job_status = models.CharField(max_length=20,default="running",null=True)
+    property = models.ForeignKey(Property, on_delete=models.CASCADE)
+    unit_type = models.CharField(max_length=30, default='')
+    days_on_market = models.IntegerField(null=True, blank=True)
+    agent_name = models.CharField(max_length=100, null=True, blank=True)
+    agent_phone = models.CharField(max_length=20, null=True, blank=True)
+    common_charges = models.CharField(max_length=20, null=True, blank=True)
+    estimated_payment = models.CharField(max_length=20, null=True, blank=True)
+    taxes = models.CharField(max_length=20, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True)
+    unit_category = models.PositiveSmallIntegerField(default=0)
 
+    class Meta:
+        db_table = 'new_unit'
 
 # class Job(models.Model):
 #     user = models.ForeignKey(RealityUser, on_delete=models.CASCADE, null=True)

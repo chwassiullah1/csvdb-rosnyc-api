@@ -1,6 +1,6 @@
 # serializers.py
 from rest_framework import serializers
-from .models import Property, Unit, RealityUser, Jobs, TemplateDescription, Refresh, Schedule, Scheduleunits, WebTitle
+from .models import Property, Unit, NewUnit, RealityUser, Jobs, TemplateDescription, Refresh, Schedule, Scheduleunits, WebTitle
 
 
 class UploadURLSerializer(serializers.ModelSerializer):
@@ -92,9 +92,29 @@ class WebTitleSerializer(serializers.ModelSerializer):
 class PropertySerializer(serializers.ModelSerializer):
     class Meta:
         model = Property
-        fields = ['id', 'url']
+        fields = ['id', 'url', 'area']
 
 class UnitFilterSerializer(serializers.ModelSerializer):
     class Meta:
         model = Unit
         fields = ['id']
+
+class SafeIntField(serializers.Field):
+    def to_representation(self, value):
+        if value is None:
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            # Extract leading digits from strings like "64 days" -> 64
+            import re
+            match = re.search(r'\d+', str(value))
+            return int(match.group()) if match else None
+
+class NewUnitFilterSerializer(serializers.ModelSerializer):
+    property = PropertySerializer(read_only=True)
+    days_on_market = SafeIntField()
+
+    class Meta:
+        model = NewUnit
+        fields = '__all__'
